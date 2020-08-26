@@ -1,0 +1,20 @@
+{
+  "name": "www-tester",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A template for kick starting a Cloudflare Workers project",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "run-tests --no-unit"
+  },
+  "dependencies": {
+    "@cloudflare/kv-asset-handler": "^0.0.11",
+    "@reima-ecom/run-tests": "^1.0.0",
+    "@reima-ecom/worker-ab": "^1.0.0",
+    "@reima-ecom/worker-www": "^1.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^2.0.0"
+  }
+}

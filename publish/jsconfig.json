@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonJS",
+    "lib": [
+      "ES2020",
+      "WebWorker"
+    ],
+    "checkJs": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "worker"
+  ]
+}

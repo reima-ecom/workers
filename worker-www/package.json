@@ -1,0 +1,23 @@
+{
+  "name": "@reima-ecom/worker-www",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "publishConfig": {
+    "registry":"https://npm.pkg.github.com/"
+  },
+  "repository" : {
+    "type" : "git",
+    "url": "git://github.com/reima-ecom/reima-us.git",
+    "directory": "packages/worker-www"
+  },
+  "scripts": {
+    "test": "run-tests"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^2.0.0",
+    "@reima-ecom/run-tests": "^1.0.0",
+    "ava": "^3.9.0",
+    "node-fetch": "^2.6.0"
+  }
+}

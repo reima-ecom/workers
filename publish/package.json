@@ -1,0 +1,12 @@
+{
+  "name": "worker-publish",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "run-tests --no-unit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

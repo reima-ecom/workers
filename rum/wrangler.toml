@@ -1,0 +1,5 @@
+name = "real-user-monitoring"
+type = "javascript"
+account_id = "25fd4a605fa32029740e7374ebb26cab"
+zone_id = "3980cfad0b00f921b393e399d3d2b9a1"
+route = "us.reima.com/api/rum"

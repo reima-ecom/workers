@@ -1,0 +1,15 @@
+{
+  "name": "@reima-ecom/worker-ab",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "run-tests --no-unit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^2.0.0",
+    "@reima-ecom/run-tests": "^1.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+name = "www-tester"
+type = "webpack"
+account_id = "25fd4a605fa32029740e7374ebb26cab"
+workers_dev = true
+
+kv-namespaces = [
+  { binding = "REDIRECTS", id = "f7174f66e7254e3a8748ccd2d7cc0d22" }
+]
+
+[site]
+bucket = "./site"
+entry-point = "."
