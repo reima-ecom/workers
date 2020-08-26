@@ -1,7 +1,7 @@
 /** @type {{ [referer: string]: {repo: string, workflow: string} }} */
 const WORKFLOW_BY_REFERER = {
-  'us.reima.com': { repo: 'reima-us', workflow: 'publish-us' },
-  'www.reima.ca': { repo: 'reima-us', workflow: 'publish-ca' },
+  'us.reima.com': { repo: 'north-america', workflow: 'publish-us' },
+  'www.reima.ca': { repo: 'north-america', workflow: 'publish-ca' },
   'www.reimajapan.com': { repo: 'japan', workflow: 'publish' },
 };
 
