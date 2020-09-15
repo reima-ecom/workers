@@ -13,9 +13,13 @@
     "extensions": [
         "denoland.vscode-deno"
     ],
+    "remoteEnv": {
+        "CF_EMAIL": "eric@finnishbabybox.com",
+        "CF_API_TOKEN": "${localEnv:CF_API_TOKEN}"
+    },
 
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
-    // "forwardPorts": [],
+    "forwardPorts": [8787],
 
     // Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
     // "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
