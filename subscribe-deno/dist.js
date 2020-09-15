@@ -179,25 +179,40 @@ System.register("index", ["shopify-subscribe"], function (exports_2, context_2) 
         ],
         execute: function () {
             handleRequest = async (event) => {
-                const referer = event.request.headers.get("Referer") || "";
-                const hostConfig = self[referer];
+                const origin = event.request.headers.get("Origin") || "";
+                const hostConfig = self[origin];
+                console.log("Origin:", origin);
+                console.log("Config:", hostConfig);
                 if (!hostConfig)
                     return new Response("No shop found", { status: 400 });
-                const [shopifyShop, shopifyBasicAuth] = hostConfig.split(":");
-                const subscribe = shopify_subscribe_js_1.default(fetch, shopifyBasicAuth, shopifyShop);
-                try {
-                    const body = await event.request.json();
-                    await subscribe({
-                        email: body.email,
-                        consent: body.consent,
-                        marketing: body.marketing,
-                        tags: body.tags,
-                    });
-                    return new Response("Done");
+                const headers = {
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Method": "POST",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                };
+                if (event.request.method === "OPTIONS") {
+                    return new Response("Ok", { headers });
                 }
-                catch (error) {
-                    console.log(error);
-                    return new Response(error.body || "Error", { status: error.statusCode || 500 });
+                else if (event.request.method === "POST") {
+                    const [shopifyShop, shopifyBasicAuth] = hostConfig.split(":");
+                    const subscribe = shopify_subscribe_js_1.default(fetch, shopifyBasicAuth, shopifyShop);
+                    try {
+                        const body = await event.request.json();
+                        await subscribe({
+                            email: body.email,
+                            consent: body.consent,
+                            marketing: body.marketing,
+                            tags: body.tags,
+                        });
+                        return new Response("Done", { headers });
+                    }
+                    catch (error) {
+                        console.log(error);
+                        return new Response(error.body || "Error", { status: error.statusCode || 500, headers });
+                    }
+                }
+                else {
+                    return new Response("Method Not Allowed", { status: 405 });
                 }
             };
             addEventListener("fetch", (event) => {

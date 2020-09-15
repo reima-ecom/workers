@@ -8,33 +8,51 @@ interface FetchEvent extends Event {
 
 const handleRequest = async (event: FetchEvent): Promise<Response> => {
   // get requesting page host
-  const referer = event.request.headers.get("Referer") || "";
+  const origin = event.request.headers.get("Origin") || "";
   // get config for the host
-  const hostConfig: string = (self as any)[referer];
+  const hostConfig: string = (self as any)[origin];
 
+  console.log("Origin:", origin);
+  console.log("Config:", hostConfig);
+
+  // fail if no shop found
   if (!hostConfig) return new Response("No shop found", { status: 400 });
 
-  // environment variable should be in the form
-  // "shopify-shop:basic auth", e.g. "reima-us:eoea12a"
-  const [shopifyShop, shopifyBasicAuth] = hostConfig.split(":");
-  const subscribe = getSubscriber(fetch, shopifyBasicAuth, shopifyShop);
+  // cors headers
+  const headers = {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Method": "POST",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
 
-  try {
-    const body = await event.request.json();
-    await subscribe({
-      email: body.email,
-      consent: body.consent,
-      marketing: body.marketing,
-      tags: body.tags,
-    });
-    return new Response("Done");
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.log(error);
-    return new Response(
-      error.body || "Error",
-      { status: error.statusCode || 500 },
-    );
+  // if this is cors preflight, return accordingly
+  if (event.request.method === "OPTIONS") {
+    return new Response("Ok", { headers });
+  } else if (event.request.method === "POST") {
+    // environment variable should be in the form
+    // "shopify-shop:basic auth", e.g. "reima-us:eoea12a"
+    const [shopifyShop, shopifyBasicAuth] = hostConfig.split(":");
+    const subscribe = getSubscriber(fetch, shopifyBasicAuth, shopifyShop);
+
+    try {
+      const body = await event.request.json();
+      await subscribe({
+        email: body.email,
+        consent: body.consent,
+        marketing: body.marketing,
+        tags: body.tags,
+      });
+      return new Response("Done", { headers });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+      return new Response(
+        error.body || "Error",
+        { status: error.statusCode || 500, headers },
+      );
+    }
+  } else {
+    return new Response("Method Not Allowed", { status: 405 });
   }
 };
 
