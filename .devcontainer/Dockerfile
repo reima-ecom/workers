@@ -1,7 +1,5 @@
 FROM mcr.microsoft.com/vscode/devcontainers/base:0-buster
 
-ARG VERSION=1.11.0
-
 ENV DENO_INSTALL=/deno
 RUN mkdir -p /deno \
     && curl -fsSL https://deno.land/x/install/install.sh | sh \
@@ -15,10 +13,11 @@ ENV PATH=${DENO_INSTALL}/bin:${PATH} \
 #    && apt-get -y install --no-install-recommends <package list>
 
 # Manual bin install of wrangler
-RUN wget -q -O wrangler-${VERSION}.tar.gz \
-    https://github.com/cloudflare/wrangler/releases/download/v${VERSION}/wrangler-v${VERSION}-x86_64-unknown-linux-musl.tar.gz \
-    && tar xf wrangler-${VERSION}.tar.gz -C /usr/local/bin --strip-components=1 dist/wrangler \
-    && rm wrangler-${VERSION}.tar.gz
+ARG WRANGLER_VERSION=1.11.0
+RUN wget -q -O wrangler-${WRANGLER_VERSION}.tar.gz \
+    https://github.com/cloudflare/wrangler/releases/download/v${WRANGLER_VERSION}/wrangler-v${WRANGLER_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+    && tar xf wrangler-${WRANGLER_VERSION}.tar.gz -C /usr/local/bin --strip-components=1 dist/wrangler \
+    && rm wrangler-${WRANGLER_VERSION}.tar.gz
 
 # Install cloudflared for wrangler log tailing
 ARG CLOUDFLARED_VERSION=VdrWdbjqyF

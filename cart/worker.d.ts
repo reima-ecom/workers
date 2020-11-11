@@ -1,1 +1,0 @@
-import worker from '@cloudflare/workers-types'

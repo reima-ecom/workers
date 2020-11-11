@@ -1,29 +1,31 @@
 // For format details, see https://aka.ms/vscode-remote/devcontainer.json or this file's README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.134.1/containers/deno
 {
-    "name": "Deno",
-    "dockerFile": "Dockerfile",
-
-    // Set *default* container specific settings.json values on container create.
-    "settings": { 
-        "terminal.integrated.shell.linux": "/bin/bash"
-    },
-
-    // Add the IDs of extensions you want installed when the container is created.
-    "extensions": [
-        "denoland.vscode-deno"
-    ],
-    "remoteEnv": {
-        "CF_EMAIL": "eric@finnishbabybox.com",
-        "CF_API_TOKEN": "${localEnv:CF_API_TOKEN}"
-    },
-
-    // Use 'forwardPorts' to make a list of ports inside the container available locally.
-    "forwardPorts": [8787],
-
-    // Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
-    // "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
-
-    // Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
-    // "remoteUser": "vscode"
+  "name": "Deno",
+  "dockerFile": "Dockerfile",
+  "build": {
+    "args": {
+      "VERSION": "1.5.2"
+    }
+  },
+  // Set *default* container specific settings.json values on container create.
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  // Add the IDs of extensions you want installed when the container is created.
+  "extensions": [
+    "denoland.vscode-deno"
+  ],
+  "remoteEnv": {
+    "CF_EMAIL": "eric@finnishbabybox.com",
+    "CF_API_TOKEN": "${localEnv:CF_API_TOKEN}"
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [
+    8787
+  ],
+  // Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
+  // "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
+  // Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
+  // "remoteUser": "vscode"
 }

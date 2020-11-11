@@ -1,14 +1,6 @@
 {
   "name": "cart",
   "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
-  "private": true,
-  "scripts": {
-    "test": "run-tests --no-unit"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@cloudflare/workers-types": "^2.0.0"
-  }
+  "main": "dist.js",
+  "private": true
 }
