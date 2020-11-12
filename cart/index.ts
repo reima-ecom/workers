@@ -10,11 +10,13 @@ import {
   LineItem,
 } from "./deps.ts";
 
-const formatMoney = (money: { amount: string; currencyCode: string }) => {
+type MoneyFormatter = (money: { amount: string; currencyCode: string }) => string;
+
+const formatMoney: MoneyFormatter = ({ amount, currencyCode }) => {
   return new Intl.NumberFormat("en", {
     style: "currency",
-    currency: money.currencyCode,
-  }).format(Number.parseFloat(money.amount));
+    currency: currencyCode,
+  }).format(Number.parseFloat(amount));
 };
 
 const renderLineItem = (lineItem: LineItem) =>
@@ -31,8 +33,9 @@ const renderLineItem = (lineItem: LineItem) =>
 </li>
 `;
 
-const getElementHandlers = (
-  checkout: Checkout,
+export const getElementHandlers = (
+  checkout: Checkout | null,
+  format: MoneyFormatter = formatMoney,
 ): {
   items: ElementHandler;
   subtotal: ElementHandler;
@@ -40,22 +43,28 @@ const getElementHandlers = (
 } => ({
   button: {
     element: (element) => {
-      element.setAttribute("href", checkout.webUrl);
+      if (checkout) {
+        element.setAttribute("href", checkout.webUrl);
+      }
     },
   },
   items: {
     element: (element) => {
-      if (checkout.lineItems.edges.length) {
+      if (checkout?.lineItems.edges.length) {
         const content = checkout.lineItems.edges.map(({ node: lineItem }) =>
           renderLineItem(lineItem)
         ).join("");
         element.setInnerContent(content, { html: true });
+      } else {
+        element.setInnerContent("");
       }
     },
   },
   subtotal: {
     element: (element) => {
-      element.setInnerContent(formatMoney(checkout.subtotal));
+      if (checkout) {
+        element.setInnerContent(format(checkout.subtotal));
+      }
     },
   },
 });
