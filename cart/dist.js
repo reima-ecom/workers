@@ -1,39 +1,3 @@
-const FRAGMENTS = `\n  fragment MoneyFragment on MoneyV2 {\n    amount\n    currencyCode\n  }\n\n  fragment ${"CheckoutFragment"} on Checkout {\n    id\n    webUrl\n    subtotal: subtotalPriceV2 { ...MoneyFragment }\n    lineItems(first: 250) {\n      edges {\n        node {\n          id\n          title\n          variant {\n            title\n            image {\n              src: originalSrc\n              altText\n            }\n            price: priceV2 { ...MoneyFragment }\n          }\n          quantity\n        }\n      }\n    }\n  }\n`;
-const CHECKOUT_QUERY = `\n  ${FRAGMENTS}\n  query ($id:ID!) {\n    node(id: $id) { ...${"CheckoutFragment"} }\n  }\n`;
-const CHECKOUT_ADD_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {\n    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
-const CHECKOUT_REMOVE_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {\n    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
-const formatMoney = (money)=>{
-    return new Intl.NumberFormat("en", {
-        style: "currency",
-        currency: money.currencyCode
-    }).format(Number.parseFloat(money.amount));
-};
-const renderLineItem = (lineItem)=>`\n<li>\n  <img src="${lineItem.variant.image.src}" alt="${lineItem.variant.image.altText}">\n  <div>\n    <h2>${lineItem.title}</h2>\n    <h3>${lineItem.variant.title}</h3>\n    <div>${lineItem.quantity} pcs</div>\n    <a href="?remove=${lineItem.id}">Remove</a>\n  </div>\n  <strong>${formatMoney(lineItem.variant.price)}</strong>\n</li>\n`
-;
-const getElementHandlers = (checkout)=>({
-        button: {
-            element: (element)=>{
-                element.setAttribute("href", checkout.webUrl);
-            }
-        },
-        items: {
-            element: (element)=>{
-                if (checkout.lineItems.edges.length) {
-                    const content = checkout.lineItems.edges.map(({ node: lineItem  })=>renderLineItem(lineItem)
-                    ).join("\n");
-                    element.setInnerContent(content, {
-                        html: true
-                    });
-                }
-            }
-        },
-        subtotal: {
-            element: (element)=>{
-                element.setInnerContent(formatMoney(checkout.subtotal));
-            }
-        }
-    })
-;
 const getCookie = (request, name)=>{
     let result = null;
     const cookieString = request.headers.get("Cookie");
@@ -48,6 +12,46 @@ const getCookie = (request, name)=>{
         });
     }
     return result;
+};
+const FRAGMENTS = `\n  fragment MoneyFragment on MoneyV2 {\n    amount\n    currencyCode\n  }\n\n  fragment ${"CheckoutFragment"} on Checkout {\n    id\n    webUrl\n    subtotal: subtotalPriceV2 { ...MoneyFragment }\n    lineItems(first: 250) {\n      edges {\n        node {\n          id\n          title\n          variant {\n            title\n            image {\n              src: originalSrc\n              altText\n            }\n            price: priceV2 { ...MoneyFragment }\n          }\n          quantity\n        }\n      }\n    }\n  }\n`;
+const CHECKOUT_QUERY = `\n  ${FRAGMENTS}\n  query ($id:ID!) {\n    node(id: $id) { ...${"CheckoutFragment"} }\n  }\n`;
+const CHECKOUT_ADD_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {\n    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
+const CHECKOUT_REMOVE_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {\n    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
+const checkoutRemoveItem = async (graphQlRunner, checkoutId, lineItemId)=>{
+    const result = await graphQlRunner({
+        query: CHECKOUT_REMOVE_LINEITEM,
+        variables: {
+            checkoutId,
+            lineItemIds: [
+                lineItemId
+            ]
+        }
+    });
+    return result.checkoutLineItemsRemove.checkout;
+};
+const checkoutAddItem = async (graphQlRunner, checkoutId, variantId)=>{
+    const result = await graphQlRunner({
+        query: CHECKOUT_ADD_LINEITEM,
+        variables: {
+            checkoutId,
+            lineItems: [
+                {
+                    quantity: 1,
+                    variantId
+                }, 
+            ]
+        }
+    });
+    return result.checkoutLineItemsAdd.checkout;
+};
+const checkoutGet = async (graphQlRunner, checkoutId)=>{
+    const result = await graphQlRunner({
+        query: CHECKOUT_QUERY,
+        variables: {
+            id: checkoutId
+        }
+    });
+    return result.node;
 };
 const getGraphQlRunner = (shopifyStore, shopifyStorefrontToken)=>async (graphQl)=>{
         const resp = await fetch(`https://${shopifyStore}.myshopify.com/api/2020-04/graphql`, {
@@ -68,6 +72,38 @@ const getGraphQlRunner = (shopifyStore, shopifyStorefrontToken)=>async (graphQl)
         return data;
     }
 ;
+const formatMoney = (money)=>{
+    return new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: money.currencyCode
+    }).format(Number.parseFloat(money.amount));
+};
+const renderLineItem = (lineItem)=>`\n<li>\n  <img src="${lineItem.variant.image.src}" alt="${lineItem.variant.image.altText}">\n  <div>\n    <h2>${lineItem.title}</h2>\n    <h3>${lineItem.variant.title}</h3>\n    <div>${lineItem.quantity} pcs</div>\n    <a href="?remove=${lineItem.id}">Remove</a>\n  </div>\n  <strong>${formatMoney(lineItem.variant.price)}</strong>\n</li>\n`
+;
+const getElementHandlers = (checkout)=>({
+        button: {
+            element: (element)=>{
+                element.setAttribute("href", checkout.webUrl);
+            }
+        },
+        items: {
+            element: (element)=>{
+                if (checkout.lineItems.edges.length) {
+                    const content = checkout.lineItems.edges.map(({ node: lineItem  })=>renderLineItem(lineItem)
+                    ).join("");
+                    element.setInnerContent(content, {
+                        html: true
+                    });
+                }
+            }
+        },
+        subtotal: {
+            element: (element)=>{
+                element.setInnerContent(formatMoney(checkout.subtotal));
+            }
+        }
+    })
+;
 const handleRequest = async (event, options)=>{
     const templateResponsePromise = fetch(options.cartTemplateUrl);
     const checkoutId = getCookie(event.request, "X-checkout");
@@ -77,38 +113,11 @@ const handleRequest = async (event, options)=>{
         const graphQlQuery = getGraphQlRunner(options.shopifyStore, options.shopifyStorefrontToken);
         const url = new URL(event.request.url);
         if (url.searchParams.has("remove")) {
-            const result = await graphQlQuery({
-                query: CHECKOUT_REMOVE_LINEITEM,
-                variables: {
-                    checkoutId,
-                    lineItemIds: [
-                        url.searchParams.get("remove")
-                    ]
-                }
-            });
-            checkout = result.checkoutLineItemsRemove.checkout;
+            checkout = await checkoutRemoveItem(graphQlQuery, checkoutId, url.searchParams.get("remove"));
         } else if (url.searchParams.has("add")) {
-            const result = await graphQlQuery({
-                query: CHECKOUT_ADD_LINEITEM,
-                variables: {
-                    checkoutId,
-                    lineItems: [
-                        {
-                            quantity: 1,
-                            variantId: url.searchParams.get("add")
-                        }, 
-                    ]
-                }
-            });
-            checkout = result.checkoutLineItemsAdd.checkout;
+            checkout = await checkoutAddItem(graphQlQuery, checkoutId, url.searchParams.get("add"));
         } else {
-            const result = await graphQlQuery({
-                query: CHECKOUT_QUERY,
-                variables: {
-                    id: checkoutId
-                }
-            });
-            checkout = result.node;
+            checkout = await checkoutGet(graphQlQuery, checkoutId);
         }
         if (!checkout) {
             return templateResponsePromise;
