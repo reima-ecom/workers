@@ -1,17 +1,13 @@
 /// <reference path="../worker-types.d.ts" />
 
-// set up constants
-const TEMPLATE_URL = "https://reima-demo.netlify.app/cart/";
-const SHOPIFY_STORE = "reima-us";
-const STOREFRONT_TOKEN = "d2990d8e29e763239f8e8ff6cefc9ebe";
-
-const CHECKOUT_QUERY = `
+const FRAGMENTS_CHECKOUT = "CheckoutFragment";
+const FRAGMENTS = `
   fragment MoneyFragment on MoneyV2 {
     amount
     currencyCode
   }
 
-  fragment CheckoutFragment on Checkout {
+  fragment ${FRAGMENTS_CHECKOUT} on Checkout {
     id
     webUrl
     subtotal: subtotalPriceV2 { ...MoneyFragment }
@@ -33,10 +29,60 @@ const CHECKOUT_QUERY = `
       }
     }
   }
+`;
+
+const CHECKOUT_QUERY = `
+  ${FRAGMENTS}
   query ($id:ID!) {
-    node(id: $id) { ...CheckoutFragment }
+    node(id: $id) { ...${FRAGMENTS_CHECKOUT} }
   }
 `;
+type CheckoutQueryResult = {
+  node?: Checkout;
+};
+
+const CHECKOUT_ADD_LINEITEM = `
+  ${FRAGMENTS}
+  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {
+    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {
+      checkout { ...${FRAGMENTS_CHECKOUT} }
+      checkoutUserErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+type CheckoutAddLineitemResult = {
+  checkoutLineItemsAdd: {
+    checkout: Checkout;
+  };
+};
+
+const CHECKOUT_REMOVE_LINEITEM = `
+  ${FRAGMENTS}
+  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {
+    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {
+      checkout { ...${FRAGMENTS_CHECKOUT} }
+      checkoutUserErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+type CheckoutRemoveLineitemResult = {
+  checkoutLineItemsRemove: {
+    checkout: Checkout;
+  };
+};
+
+type GraphQl = {
+  query: string;
+  variables: any;
+};
 
 type MoneyV2 = {
   amount: string;
@@ -83,6 +129,7 @@ const renderLineItem = (lineItem: LineItem) =>
     <h2>${lineItem.title}</h2>
     <h3>${lineItem.variant.title}</h3>
     <div>${lineItem.quantity} pcs</div>
+    <a href="?remove=${lineItem.id}">Remove</a>
   </div>
   <strong>${formatMoney(lineItem.variant.price)}</strong>
 </li>
@@ -136,69 +183,130 @@ const getCookie = (request: Request, name: string) => {
   return result;
 };
 
-type GraphQl = {
-  query: string;
-  variables: any;
-};
-
-type GraphQlData<T> = {
-  node: T;
-};
-
-const graphQlQuery = async (
-  graphQl: GraphQl,
-): Promise<GraphQlData<Checkout>> => {
-  const resp = await fetch(
-    `https://${SHOPIFY_STORE}.myshopify.com/api/2020-04/graphql`,
-    {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN,
+const getGraphQlRunner = (
+  shopifyStore: string,
+  shopifyStorefrontToken: string,
+) =>
+  async <T = any>(
+    graphQl: GraphQl,
+  ): Promise<T> => {
+    const resp = await fetch(
+      `https://${shopifyStore}.myshopify.com/api/2020-04/graphql`,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Shopify-Storefront-Access-Token": shopifyStorefrontToken,
+        },
+        method: "POST",
+        body: JSON.stringify(graphQl),
       },
-      method: "POST",
-      body: JSON.stringify(graphQl),
-    },
-  );
-  if (!resp.ok) throw new Error(`Could not query: ${resp.statusText}`);
-  const { data, errors } = await resp.json();
-  if (errors) {
-    errors.forEach(console.error);
-    throw new Error("Errors encountered - see above");
-  }
-  return data;
+    );
+    if (!resp.ok) throw new Error(`Could not query: ${resp.statusText}`);
+    const { data, errors } = await resp.json();
+    if (errors) {
+      errors.forEach(console.error);
+      throw new Error("Errors encountered - see above");
+    }
+    return data;
+  };
+
+type RequestHandlerOptions = {
+  shopifyStore: string;
+  shopifyStorefrontToken: string;
+  cartTemplateUrl: string;
 };
 
-const handleRequest = async (event: FetchEvent): Promise<Response> => {
-  const res = await fetch(TEMPLATE_URL);
+const handleRequest = async (
+  event: FetchEvent,
+  options: RequestHandlerOptions,
+): Promise<Response> => {
+  const templateResponsePromise = fetch(options.cartTemplateUrl);
   const checkoutId = getCookie(event.request, "X-checkout");
+  console.log(options);
 
   if (checkoutId) {
-    const result = await graphQlQuery({
-      query: CHECKOUT_QUERY,
-      variables: { id: checkoutId },
-    });
+    let checkout: Checkout | undefined;
+    const graphQlQuery = getGraphQlRunner(
+      options.shopifyStore,
+      options.shopifyStorefrontToken,
+    );
+    const url = new URL(event.request.url);
 
-    const handlers = getElementHandlers(result.node);
+    // remove item if specified in search params
+    if (url.searchParams.has("remove")) {
+      const result = await graphQlQuery<CheckoutRemoveLineitemResult>({
+        query: CHECKOUT_REMOVE_LINEITEM,
+        variables: {
+          checkoutId,
+          lineItemIds: [url.searchParams.get("remove")],
+        },
+      });
+      checkout = result.checkoutLineItemsRemove.checkout;
+    } else if (url.searchParams.has("add")) {
+      const result = await graphQlQuery<CheckoutAddLineitemResult>({
+        query: CHECKOUT_ADD_LINEITEM,
+        variables: {
+          checkoutId,
+          lineItems: [
+            { quantity: 1, variantId: url.searchParams.get("add") },
+          ],
+        },
+      });
+      checkout = result.checkoutLineItemsAdd.checkout;
+    } else {
+      const result = await graphQlQuery<CheckoutQueryResult>({
+        query: CHECKOUT_QUERY,
+        variables: { id: checkoutId },
+      });
+      checkout = result.node;
+    }
+
+    // bail if no checkout found
+    if (!checkout) {
+      return templateResponsePromise;
+    }
+
+    const handlers = getElementHandlers(checkout);
 
     return new HTMLRewriter()
-      .on(".cart > ul", handlers.items)
-      .on("[weburl]", handlers.button)
+      .on("[items]", handlers.items)
+      .on("[checkout]", handlers.button)
       .on("[subtotal]", handlers.subtotal)
-      .transform(res);
+      .transform(await templateResponsePromise);
   }
 
-  return res;
+  return templateResponsePromise;
 };
 
 addEventListener("fetch", (event) => {
+  // get configuration
+  const host = event.request.headers.get("Host") || "";
+  const hostConfig: string = (self as any)[host];
+  // bail if no config found
+  if (!hostConfig) {
+    event.respondWith(new Response(`Not found: ${host}`, { status: 404 }));
+    return;
+  }
+  // get store and token
+  const [
+    shopifyStore,
+    shopifyStorefrontToken,
+    cartTemplateUrl,
+  ] = hostConfig.split(";");
+
   // if the path has an extension, pass through
-  // this is used only for local development
+  // enable ONLY for local development
   if (new URL(event.request.url).pathname.split("/").pop()?.includes(".")) {
     return;
   }
 
-  event.respondWith(handleRequest(event));
+  event.respondWith(
+    handleRequest(
+      event,
+      { cartTemplateUrl, shopifyStore, shopifyStorefrontToken },
+    ),
+  );
 });
 
 export {};
