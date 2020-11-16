@@ -59,3 +59,17 @@ Each line items render the following HTML (see the source code if this seems out
 ```
 
 In case there is no active checkout or it doesn't contain any line items, the contents of `ul[items]` will be cleared. So in this case you can use the `:empty` CSS selector.
+
+## Development
+
+The worker is written in Typescript and bundled to JS using Deno. Bundle using the command:
+
+```sh
+deno bundle index.ts dist.js
+```
+
+Local testing can be done using:
+
+```sh
+wrangler dev --host reima-demo.netlify.app --env dev
+```

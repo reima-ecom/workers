@@ -1,15 +1,18 @@
 import {
   CHECKOUT_ADD_LINEITEM,
+  CHECKOUT_CREATE,
   CHECKOUT_QUERY,
   CHECKOUT_REMOVE_LINEITEM,
   CheckoutAddLineitemResult,
+  CheckoutCreateInput,
+  CheckoutCreateResult,
   CheckoutQueryResult,
   CheckoutRemoveLineitemResult,
 } from "./queries.ts";
 import { getGraphQlRunner } from "./graphql.ts";
 export type { Checkout, LineItem, MoneyV2 } from "./queries.ts";
 
-type GraphQlRunner = ReturnType<typeof getGraphQlRunner>;
+export type GraphQlRunner = ReturnType<typeof getGraphQlRunner>;
 
 export const checkoutRemoveItem = async (
   graphQlRunner: GraphQlRunner,
@@ -28,16 +31,31 @@ export const checkoutRemoveItem = async (
 
 export const checkoutAddItem = async (
   graphQlRunner: GraphQlRunner,
-  checkoutId: string,
+  checkoutId: string | undefined,
   variantId: string,
 ) => {
+  const lineItems = [
+    { quantity: 1, variantId },
+  ];
+
+  if (!checkoutId) {
+    const createdCheckout = await graphQlRunner<
+      CheckoutCreateResult,
+      CheckoutCreateInput
+    >({
+      query: CHECKOUT_CREATE,
+      variables: {
+        input: { lineItems },
+      },
+    });
+    return createdCheckout.checkoutCreate.checkout;
+  }
+
   const result = await graphQlRunner<CheckoutAddLineitemResult>({
     query: CHECKOUT_ADD_LINEITEM,
     variables: {
       checkoutId,
-      lineItems: [
-        { quantity: 1, variantId },
-      ],
+      lineItems,
     },
   });
   return result.checkoutLineItemsAdd.checkout;

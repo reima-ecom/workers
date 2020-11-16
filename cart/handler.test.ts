@@ -6,7 +6,7 @@
 // check that POST set works
 
 import { assert, Checkout } from "./deps.ts";
-import { getElementHandlers } from "./index.ts";
+import { getElementHandlers } from "./handler.ts";
 
 Deno.test("element items set to empty on null checkout", () => {
   const elementHandlers = getElementHandlers(null);

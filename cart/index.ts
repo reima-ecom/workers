@@ -1,129 +1,12 @@
 /// <reference path="../worker-types.d.ts" />
 
 import {
-  Checkout,
   checkoutAddItem,
   checkoutGet,
   checkoutRemoveItem,
-  getCookie,
   getGraphQlRunner,
-  LineItem,
 } from "./deps.ts";
-
-type MoneyFormatter = (money: { amount: string; currencyCode: string }) => string;
-
-const formatMoney: MoneyFormatter = ({ amount, currencyCode }) => {
-  return new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: currencyCode,
-  }).format(Number.parseFloat(amount));
-};
-
-const renderLineItem = (lineItem: LineItem) =>
-  `
-<li>
-  <img src="${lineItem.variant.image.src}" alt="${lineItem.variant.image.altText}">
-  <div>
-    <h2>${lineItem.title}</h2>
-    <h3>${lineItem.variant.title}</h3>
-    <div>${lineItem.quantity} pcs</div>
-    <a href="?remove=${lineItem.id}">Remove</a>
-  </div>
-  <strong>${formatMoney(lineItem.variant.price)}</strong>
-</li>
-`;
-
-export const getElementHandlers = (
-  checkout: Checkout | null,
-  format: MoneyFormatter = formatMoney,
-): {
-  items: ElementHandler;
-  subtotal: ElementHandler;
-  button: ElementHandler;
-} => ({
-  button: {
-    element: (element) => {
-      if (checkout) {
-        element.setAttribute("href", checkout.webUrl);
-      }
-    },
-  },
-  items: {
-    element: (element) => {
-      if (checkout?.lineItems.edges.length) {
-        const content = checkout.lineItems.edges.map(({ node: lineItem }) =>
-          renderLineItem(lineItem)
-        ).join("");
-        element.setInnerContent(content, { html: true });
-      } else {
-        element.setInnerContent("");
-      }
-    },
-  },
-  subtotal: {
-    element: (element) => {
-      if (checkout) {
-        element.setInnerContent(format(checkout.subtotal));
-      }
-    },
-  },
-});
-
-type RequestHandlerOptions = {
-  shopifyStore: string;
-  shopifyStorefrontToken: string;
-  cartTemplateUrl: string;
-};
-
-const handleRequest = async (
-  event: FetchEvent,
-  options: RequestHandlerOptions,
-): Promise<Response> => {
-  const templateResponsePromise = fetch(options.cartTemplateUrl);
-  const checkoutId = getCookie(event.request, "X-checkout");
-  console.log(options);
-
-  if (checkoutId) {
-    let checkout: Checkout | undefined;
-    const graphQlQuery = getGraphQlRunner(
-      options.shopifyStore,
-      options.shopifyStorefrontToken,
-    );
-    const url = new URL(event.request.url);
-
-    // remove item if specified in search params
-    if (url.searchParams.has("remove")) {
-      checkout = await checkoutRemoveItem(
-        graphQlQuery,
-        checkoutId,
-        url.searchParams.get("remove")!,
-      );
-    } else if (url.searchParams.has("add")) {
-      checkout = await checkoutAddItem(
-        graphQlQuery,
-        checkoutId,
-        url.searchParams.get("add")!,
-      );
-    } else {
-      checkout = await checkoutGet(graphQlQuery, checkoutId);
-    }
-
-    // bail if no checkout found
-    if (!checkout) {
-      return templateResponsePromise;
-    }
-
-    const handlers = getElementHandlers(checkout);
-
-    return new HTMLRewriter()
-      .on("[items]", handlers.items)
-      .on("[checkout]", handlers.button)
-      .on("[subtotal]", handlers.subtotal)
-      .transform(await templateResponsePromise);
-  }
-
-  return templateResponsePromise;
-};
+import { handleRequest } from "./handler.ts";
 
 addEventListener("fetch", (event) => {
   // get configuration
@@ -149,8 +32,9 @@ addEventListener("fetch", (event) => {
 
   event.respondWith(
     handleRequest(
-      event,
+      event.request,
       { cartTemplateUrl, shopifyStore, shopifyStorefrontToken },
+      { getGraphQlRunner, checkoutGet, checkoutAddItem, checkoutRemoveItem },
     ),
   );
 });

@@ -2,7 +2,7 @@
  * Grabs the cookie with name from the request headers
  */
 export const getCookie = (request: Request, name: string) => {
- let result = null;
+ let result: string | undefined;
  const cookieString = request.headers.get("Cookie");
  if (cookieString) {
    const cookies = cookieString.split(";");

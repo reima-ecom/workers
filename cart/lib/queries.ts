@@ -29,6 +29,30 @@ const FRAGMENTS = `
   }
 `;
 
+type CheckoutLineItemInput = {
+  quantity: number;
+  variantId: string;
+};
+
+export const CHECKOUT_CREATE = `
+  ${FRAGMENTS}
+  mutation checkoutCreate($input: CheckoutCreateInput!) {
+    checkoutCreate(input: $input) {
+      checkout { ...${FRAGMENTS_CHECKOUT}}
+    }
+  }
+`;
+export type CheckoutCreateInput = {
+  input: {
+    lineItems?: CheckoutLineItemInput[];
+  }
+};
+export type CheckoutCreateResult = {
+  checkoutCreate: {
+    checkout: Checkout;
+  };
+};
+
 export const CHECKOUT_QUERY = `
   ${FRAGMENTS}
   query ($id:ID!) {
@@ -52,6 +76,10 @@ export const CHECKOUT_ADD_LINEITEM = `
     }
   }
 `;
+export type CheckoutAddLineitemVariables = {
+  checkoutId: string;
+  lineItems: CheckoutLineItemInput[];
+};
 export type CheckoutAddLineitemResult = {
   checkoutLineItemsAdd: {
     checkout: Checkout;
