@@ -1,60 +1,65 @@
-// check that env var handling works
-// check that li rendered correctly
-// check that subtotal set
-// check that GET add works
-// check that GET remove works
-// check that POST set works
+import { assert } from "./deps.ts";
+import { getEventListener } from "./handler.ts";
+import type { Checkout } from "./lib/checkout.ts";
 
-import { assert, Checkout } from "./deps.ts";
-import { getElementHandlers } from "./handler.ts";
-
-Deno.test("element items set to empty on null checkout", () => {
-  const elementHandlers = getElementHandlers(null);
-  let content = "original content that should be overwritten";
-  const element: Pick<Element, "setInnerContent"> = {
-    setInnerContent: (innerContent) => {
-      content = innerContent;
-      return undefined as unknown as Element;
+Deno.test("adding works with get variant", () => {
+  const eventListener = getEventListener({
+    checkoutAddItem: async (runner, checkoutId, variantId) => {
+      assert.strictEqual(variantId, "variant");
+      return { id: "checkout" } as Checkout;
     },
-  };
-  elementHandlers.items.element!(element as Element);
-  assert.strictEqual(content, "");
-});
-
-Deno.test("element button url set to checkout web url", () => {
-  const elementHandlers = getElementHandlers({
-    webUrl: "checkout url",
-  } as Checkout);
-  let checkoutUrl = "original url attribute";
-  const element: Pick<Element, "setAttribute"> = {
-    setAttribute: (name, value) => {
-      if (name === "href") checkoutUrl = value;
-      return undefined as unknown as Element;
-    },
-  };
-  elementHandlers.button.element!(element as Element);
-  assert.strictEqual(checkoutUrl, "checkout url");
-});
-
-Deno.test("element subtotal set to formatted subtotal", () => {
-  const elementHandlers = getElementHandlers(
-    {
-      subtotal: {
-        amount: "10.00",
-        currencyCode: "USD",
+    getResponseRewriter: (url) =>
+      async (checkout) => {
+        return new Response(checkout?.id);
       },
-    } as Checkout,
-    () => "$10.00",
-  );
-  let content = "original content that should be overwritten";
-  const element: Pick<Element, "setInnerContent"> = {
-    setInnerContent: (innerContent) => {
-      content = innerContent;
-      return undefined as unknown as Element;
+    // @ts-ignore
+    getGraphQlRunner: () => undefined,
+  });
+
+  (self as any).test = "store;token;url";
+  // @ts-ignore
+  const event: FetchEvent = {
+    request: new Request("https://test/cart?add=variant", {
+      headers: {
+        "Host": "test",
+      },
+    }),
+    respondWith: async (resp) => {
+      const body = await (await resp).text();
+      assert.strictEqual(body, "checkout");
     },
   };
-  elementHandlers.subtotal.element!(element as Element);
-  assert.strictEqual(content, "$10.00");
+
+  eventListener(event);
 });
 
-export {};
+Deno.test("adding works with form post options", () => {
+  const eventListener = getEventListener({
+    checkoutAddItem: () => Promise.resolve({ id: "checkout" } as Checkout),
+    getResponseRewriter: (url) =>
+      async (checkout) => {
+        return new Response(checkout?.id);
+      },
+    // @ts-ignore
+    getGraphQlRunner: () => undefined,
+  });
+
+  (self as any).test = "store;token;url";
+  // @ts-ignore
+  const event: FetchEvent = {
+    request: new Request("https://test/cart", {
+      body: "product-id=body&Color=Blue",
+      method: "POST",
+      headers: {
+        "Host": "test",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }),
+    respondWith: async (resp) => {
+      const body = await (await resp).text();
+      assert.strictEqual(body, "checkout");
+    },
+  };
+
+  eventListener(event);
+});

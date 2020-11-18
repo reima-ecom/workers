@@ -68,6 +68,7 @@ const CHECKOUT_CREATE = `\n  ${FRAGMENTS}\n  mutation checkoutCreate($input: Che
 const CHECKOUT_QUERY = `\n  ${FRAGMENTS}\n  query ($id:ID!) {\n    node(id: $id) { ...${"CheckoutFragment"} }\n  }\n`;
 const CHECKOUT_ADD_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {\n    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
 const CHECKOUT_REMOVE_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {\n    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
+const PRODUCT_VARIANT_ID = `\n  fragment ProductVariant on Product {\n    variantBySelectedOptions (selectedOptions: $selectedOptions) {\n      id\n    }\n  }\n  query ($productId:ID!, $selectedOptions: [SelectedOptionInput!]!) {\n    node(id: $productId) { ...ProductVariant }\n  }\n`;
 const checkoutRemoveItem = async (graphQlRunner, checkoutId, lineItemId)=>{
     const result = await graphQlRunner({
         query: CHECKOUT_REMOVE_LINEITEM,
@@ -80,7 +81,26 @@ const checkoutRemoveItem = async (graphQlRunner, checkoutId, lineItemId)=>{
     });
     return result.checkoutLineItemsRemove.checkout;
 };
-const checkoutAddItem = async (graphQlRunner, checkoutId, variantId)=>{
+const checkoutAddItem = async (graphQlRunner, checkoutId, variantOrProductId, productOptions)=>{
+    let variantId = variantOrProductId;
+    if (productOptions) {
+        const selectedOptions = Object.entries(productOptions).map((entry)=>({
+                name: entry[0],
+                value: entry[1]
+            })
+        );
+        const productWithSelectedVariant = await graphQlRunner({
+            query: PRODUCT_VARIANT_ID,
+            variables: {
+                selectedOptions,
+                productId: variantOrProductId
+            }
+        });
+        if (!productWithSelectedVariant.node) {
+            throw new Error(`Could not find product ${variantOrProductId}`);
+        }
+        variantId = productWithSelectedVariant.node.variantBySelectedOptions.id;
+    }
     const lineItems = [
         {
             quantity: 1,
@@ -137,6 +157,63 @@ const getGraphQlRunner = (shopifyStore, shopifyStorefrontToken)=>async (graphQl)
         return data;
     }
 ;
+const handleRequest = async (config, optionsPromise, deps)=>{
+    const opts = await optionsPromise;
+    const rewriteResponse = deps.getResponseRewriter(config.cartTemplateUrl);
+    let checkout;
+    const graphQlQuery = deps.getGraphQlRunner(config.shopifyStore, config.shopifyStorefrontToken);
+    if (opts.addVariantId) {
+        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addVariantId);
+    } else if (opts.addProductId) {
+        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addProductId, opts.addProductOptions);
+    } else if (opts.checkoutId && opts.removeLineitemId) {
+        checkout = await deps.checkoutRemoveItem(graphQlQuery, opts.checkoutId, opts.removeLineitemId);
+    } else if (opts.checkoutId) {
+        checkout = await deps.checkoutGet(graphQlQuery, opts.checkoutId);
+    }
+    return rewriteResponse(checkout);
+};
+const getCartConfiguration = (request)=>{
+    const host = request.headers.get("Host") || "";
+    const hostConfig = self[host];
+    if (!hostConfig) {
+        throw new Error(`Host ${host} not configured`);
+    }
+    const [shopifyStore, shopifyStorefrontToken, cartTemplateUrl, ] = hostConfig.split(";");
+    return {
+        cartTemplateUrl,
+        shopifyStore,
+        shopifyStorefrontToken
+    };
+};
+const getCheckoutOperationParameters = async (request)=>{
+    const checkoutOptions = {
+        checkoutId: getCookie(request, "X-checkout")
+    };
+    const url = new URL(request.url);
+    if (url.searchParams.has("add")) {
+        checkoutOptions.addVariantId = url.searchParams.get("add") || undefined;
+    } else if (url.searchParams.has("remove")) {
+        checkoutOptions.removeLineitemId = url.searchParams.get("remove") || undefined;
+    } else if (request.method === "POST") {
+        const formData = await request.formData();
+        checkoutOptions.addProductId = formData.get("product-id")?.toString();
+        formData.delete("product-id");
+        checkoutOptions.addProductOptions = {
+        };
+        for (const entry of formData.entries()){
+            checkoutOptions.addProductOptions[entry[0]] = entry[1].toString();
+        }
+    }
+    return checkoutOptions;
+};
+const getEventListener = (deps)=>(event)=>{
+        if (event.request.url.split("/").pop()?.includes(".")) {
+            return;
+        }
+        event.respondWith(handleRequest(getCartConfiguration(event.request), getCheckoutOperationParameters(event.request), deps));
+    }
+;
 const formatMoney = ({ amount , currencyCode  })=>{
     return new Intl.NumberFormat("en", {
         style: "currency",
@@ -177,53 +254,26 @@ const getElementHandlers = (checkout, format = formatMoney)=>({
         }
     })
 ;
-const handleRequest = async (request, options, { getGraphQlRunner: getGraphQlRunner1 , checkoutAddItem: checkoutAddItem1 , checkoutGet: checkoutGet1 , checkoutRemoveItem: checkoutRemoveItem1  })=>{
-    const templateResponsePromise = fetch(options.cartTemplateUrl);
-    const checkoutId = getCookie(request, "X-checkout");
-    console.log(options);
-    let checkout;
-    const graphQlQuery = getGraphQlRunner1(options.shopifyStore, options.shopifyStorefrontToken);
-    const url = new URL(request.url);
-    if (url.searchParams.has("add")) {
-        checkout = await checkoutAddItem1(graphQlQuery, checkoutId, url.searchParams.get("add"));
-    } else if (checkoutId && url.searchParams.has("remove")) {
-        checkout = await checkoutRemoveItem1(graphQlQuery, checkoutId, url.searchParams.get("remove"));
-    } else if (checkoutId) {
-        checkout = await checkoutGet1(graphQlQuery, checkoutId);
-    }
-    const handlers = getElementHandlers(checkout);
-    let response = await templateResponsePromise;
-    if (checkout) {
-        console.log("setting cookie");
-        response = new Response(response.body, {
-            headers: {
-                "Set-Cookie": `X-checkout=${checkout.id}; Path=/; SameSite=Lax; Max-Age=604800`
-            }
-        });
-    }
-    return new HTMLRewriter().on("[items]", handlers.items).on("[checkout]", handlers.button).on("[subtotal]", handlers.subtotal).transform(response);
+const getResponseRewriter = (cartTemplateUrl)=>{
+    const templateResponsePromise = fetch(cartTemplateUrl);
+    return async (checkout)=>{
+        const handlers = getElementHandlers(checkout);
+        let response = await templateResponsePromise;
+        if (checkout) {
+            response = new Response(response.body, {
+                headers: {
+                    "Set-Cookie": `X-checkout=${checkout.id}; Path=/; SameSite=Lax; Max-Age=604800`
+                }
+            });
+        }
+        return new HTMLRewriter().on("[items]", handlers.items).on("[checkout]", handlers.button).on("[subtotal]", handlers.subtotal).transform(response);
+    };
 };
-addEventListener("fetch", (event)=>{
-    const host = event.request.headers.get("Host") || "";
-    const hostConfig = self[host];
-    if (!hostConfig) {
-        event.respondWith(new Response(`Not found: ${host}`, {
-            status: 404
-        }));
-        return;
-    }
-    const [shopifyStore, shopifyStorefrontToken, cartTemplateUrl, ] = hostConfig.split(";");
-    if (new URL(event.request.url).pathname.split("/").pop()?.includes(".")) {
-        return;
-    }
-    event.respondWith(handleRequest(event.request, {
-        cartTemplateUrl,
-        shopifyStore,
-        shopifyStorefrontToken
-    }, {
-        getGraphQlRunner: getGraphQlRunner,
-        checkoutGet: checkoutGet,
-        checkoutAddItem: checkoutAddItem,
-        checkoutRemoveItem: checkoutRemoveItem
-    }));
+const eventListener = getEventListener({
+    checkoutAddItem: checkoutAddItem,
+    checkoutGet: checkoutGet,
+    checkoutRemoveItem: checkoutRemoveItem,
+    getGraphQlRunner: getGraphQlRunner,
+    getResponseRewriter: getResponseRewriter
 });
+addEventListener("fetch", eventListener);

@@ -45,7 +45,7 @@ export const CHECKOUT_CREATE = `
 export type CheckoutCreateInput = {
   input: {
     lineItems?: CheckoutLineItemInput[];
-  }
+  };
 };
 export type CheckoutCreateResult = {
   checkoutCreate: {
@@ -132,5 +132,30 @@ export type LineItem = {
       altText: string;
     };
     price: MoneyV2;
+  };
+};
+
+export const PRODUCT_VARIANT_ID = `
+  fragment ProductVariant on Product {
+    variantBySelectedOptions (selectedOptions: $selectedOptions) {
+      id
+    }
+  }
+  query ($productId:ID!, $selectedOptions: [SelectedOptionInput!]!) {
+    node(id: $productId) { ...ProductVariant }
+  }
+`;
+export type ProductVariantIdVariables = {
+  selectedOptions: {
+    name: string;
+    value: string;
+  }[];
+  productId: string;
+};
+export type ProductVariantIdResult = {
+  node?: {
+    variantBySelectedOptions: {
+      id: string;
+    };
   };
 };

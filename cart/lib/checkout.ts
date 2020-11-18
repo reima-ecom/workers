@@ -8,8 +8,11 @@ import {
   CheckoutCreateResult,
   CheckoutQueryResult,
   CheckoutRemoveLineitemResult,
+  PRODUCT_VARIANT_ID,
+  ProductVariantIdResult,
+  ProductVariantIdVariables,
 } from "./queries.ts";
-import { getGraphQlRunner } from "./graphql.ts";
+import type { getGraphQlRunner } from "./graphql.ts";
 export type { Checkout, LineItem, MoneyV2 } from "./queries.ts";
 
 export type GraphQlRunner = ReturnType<typeof getGraphQlRunner>;
@@ -32,8 +35,35 @@ export const checkoutRemoveItem = async (
 export const checkoutAddItem = async (
   graphQlRunner: GraphQlRunner,
   checkoutId: string | undefined,
-  variantId: string,
+  variantOrProductId: string,
+  productOptions?: { [optionName: string]: string },
 ) => {
+  // first assume this is a variant id
+  let variantId = variantOrProductId;
+
+  // ... but if we have product options, treat it as a product call
+  if (productOptions) {
+    const selectedOptions = Object
+      .entries(productOptions)
+      .map((entry) => ({ name: entry[0], value: entry[1] }));
+    const productWithSelectedVariant = await graphQlRunner<
+      ProductVariantIdResult,
+      ProductVariantIdVariables
+    >(
+      {
+        query: PRODUCT_VARIANT_ID,
+        variables: {
+          selectedOptions,
+          productId: variantOrProductId,
+        },
+      },
+    );
+    if (!productWithSelectedVariant.node) {
+      throw new Error(`Could not find product ${variantOrProductId}`);
+    }
+    variantId = productWithSelectedVariant.node.variantBySelectedOptions.id;
+  }
+
   const lineItems = [
     { quantity: 1, variantId },
   ];

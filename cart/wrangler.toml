@@ -2,6 +2,7 @@ name = "cart"
 type = "javascript"
 account_id = "25fd4a605fa32029740e7374ebb26cab"
 workers_dev = true
+vars = { "www.reimajapan.com" = "reima-jp;e0370fdfeed9aeac00130441c6e2cf76;https://www-reimajapan-com.reima.workers.dev/cart/" }
 
 [env.dev]
 name = "cart-dev"
