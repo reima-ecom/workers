@@ -34,6 +34,11 @@ type CheckoutLineItemInput = {
   variantId: string;
 };
 
+export type CustomAttributes = {
+  key: string;
+  value: string;
+}[];
+
 export const CHECKOUT_CREATE = `
   ${FRAGMENTS}
   mutation checkoutCreate($input: CheckoutCreateInput!) {
@@ -45,6 +50,7 @@ export const CHECKOUT_CREATE = `
 export type CheckoutCreateInput = {
   input: {
     lineItems?: CheckoutLineItemInput[];
+    customAttributes?: CustomAttributes
   };
 };
 export type CheckoutCreateResult = {

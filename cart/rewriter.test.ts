@@ -5,7 +5,9 @@
 // check that GET remove works
 // check that POST set works
 
-import { assert, Checkout } from "./deps.ts";
+
+import { assertEquals } from "https://deno.land/std@0.86.0/testing/asserts.ts";
+import { Checkout } from "./deps.ts";
 import { getElementHandlers } from "./rewriter.ts";
 
 Deno.test("element items set to empty on null checkout", () => {
@@ -18,7 +20,7 @@ Deno.test("element items set to empty on null checkout", () => {
     },
   };
   elementHandlers.items.element!(element as Element);
-  assert.strictEqual(content, "");
+  assertEquals(content, "");
 });
 
 Deno.test("element button url set to checkout web url", () => {
@@ -33,7 +35,7 @@ Deno.test("element button url set to checkout web url", () => {
     },
   };
   elementHandlers.button.element!(element as Element);
-  assert.strictEqual(checkoutUrl, "checkout url");
+  assertEquals(checkoutUrl, "checkout url");
 });
 
 Deno.test("element subtotal set to formatted subtotal", () => {
@@ -54,7 +56,7 @@ Deno.test("element subtotal set to formatted subtotal", () => {
     },
   };
   elementHandlers.subtotal.element!(element as Element);
-  assert.strictEqual(content, "$10.00");
+  assertEquals(content, "$10.00");
 });
 
 export {};

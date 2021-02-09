@@ -1,4 +1,4 @@
-import { assert } from "../deps.ts";
+import { assertEquals } from "https://deno.land/std@0.86.0/testing/asserts.ts";
 import { checkoutAddItem, GraphQlRunner } from "./checkout.ts";
 import { GraphQl } from "./graphql.ts";
 import {
@@ -24,5 +24,5 @@ Deno.test("adding to new checkout works", async () => {
     }
   };
   const checkout = await checkoutAddItem(graphQlRunner as GraphQlRunner, undefined, "variant");
-  assert.strictEqual(checkout.id, 'created-with-variant');
+  assertEquals(checkout.id, 'created-with-variant');
 });

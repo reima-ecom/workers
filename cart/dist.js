@@ -1,53 +1,3 @@
-const noColor = globalThis.Deno?.noColor ?? true;
-let enabled = !noColor;
-function code(open, close) {
-    return {
-        open: `\x1b[${open.join(";")}m`,
-        close: `\x1b[${close}m`,
-        regexp: new RegExp(`\\x1b\\[${close}m`, "g")
-    };
-}
-function run(str, code1) {
-    return enabled ? `${code1.open}${str.replace(code1.regexp, code1.open)}${code1.close}` : str;
-}
-function bold(str) {
-    return run(str, code([
-        1
-    ], 22));
-}
-function red(str) {
-    return run(str, code([
-        31
-    ], 39));
-}
-function green(str) {
-    return run(str, code([
-        32
-    ], 39));
-}
-function white(str) {
-    return run(str, code([
-        37
-    ], 39));
-}
-function gray(str) {
-    return brightBlack(str);
-}
-function brightBlack(str) {
-    return run(str, code([
-        90
-    ], 39));
-}
-function clampAndTruncate(n, max = 255, min = 0) {
-    return Math.trunc(Math.max(Math.min(n, max), min));
-}
-const ANSI_PATTERN = new RegExp([
-    "[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)",
-    "(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))", 
-].join("|"), "g");
-function stripColor(string) {
-    return string.replace(ANSI_PATTERN, "");
-}
 const getCookie = (request, name)=>{
     let result;
     const cookieString = request.headers.get("Cookie");
@@ -63,11 +13,12 @@ const getCookie = (request, name)=>{
     }
     return result;
 };
-const FRAGMENTS = `\n  fragment MoneyFragment on MoneyV2 {\n    amount\n    currencyCode\n  }\n\n  fragment ${"CheckoutFragment"} on Checkout {\n    id\n    webUrl\n    subtotal: subtotalPriceV2 { ...MoneyFragment }\n    lineItems(first: 250) {\n      edges {\n        node {\n          id\n          title\n          variant {\n            title\n            image {\n              src: originalSrc\n              altText\n            }\n            price: priceV2 { ...MoneyFragment }\n          }\n          quantity\n        }\n      }\n    }\n  }\n`;
-const CHECKOUT_CREATE = `\n  ${FRAGMENTS}\n  mutation checkoutCreate($input: CheckoutCreateInput!) {\n    checkoutCreate(input: $input) {\n      checkout { ...${"CheckoutFragment"}}\n    }\n  }\n`;
-const CHECKOUT_QUERY = `\n  ${FRAGMENTS}\n  query ($id:ID!) {\n    node(id: $id) { ...${"CheckoutFragment"} }\n  }\n`;
-const CHECKOUT_ADD_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {\n    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
-const CHECKOUT_REMOVE_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {\n    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {\n      checkout { ...${"CheckoutFragment"} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
+const FRAGMENTS_CHECKOUT = "CheckoutFragment";
+const FRAGMENTS = `\n  fragment MoneyFragment on MoneyV2 {\n    amount\n    currencyCode\n  }\n\n  fragment ${FRAGMENTS_CHECKOUT} on Checkout {\n    id\n    webUrl\n    subtotal: subtotalPriceV2 { ...MoneyFragment }\n    lineItems(first: 250) {\n      edges {\n        node {\n          id\n          title\n          variant {\n            title\n            image {\n              src: originalSrc\n              altText\n            }\n            price: priceV2 { ...MoneyFragment }\n          }\n          quantity\n        }\n      }\n    }\n  }\n`;
+const CHECKOUT_CREATE = `\n  ${FRAGMENTS}\n  mutation checkoutCreate($input: CheckoutCreateInput!) {\n    checkoutCreate(input: $input) {\n      checkout { ...${FRAGMENTS_CHECKOUT}}\n    }\n  }\n`;
+const CHECKOUT_QUERY = `\n  ${FRAGMENTS}\n  query ($id:ID!) {\n    node(id: $id) { ...${FRAGMENTS_CHECKOUT} }\n  }\n`;
+const CHECKOUT_ADD_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsAdd($lineItems: [CheckoutLineItemInput!]!, $checkoutId: ID!) {\n    checkoutLineItemsAdd(lineItems: $lineItems, checkoutId: $checkoutId) {\n      checkout { ...${FRAGMENTS_CHECKOUT} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
+const CHECKOUT_REMOVE_LINEITEM = `\n  ${FRAGMENTS}\n  mutation checkoutLineItemsRemove($checkoutId: ID!, $lineItemIds: [ID!]!) {\n    checkoutLineItemsRemove(checkoutId: $checkoutId, lineItemIds: $lineItemIds) {\n      checkout { ...${FRAGMENTS_CHECKOUT} }\n      checkoutUserErrors {\n        code\n        field\n        message\n      }\n    }\n  }\n`;
 const PRODUCT_VARIANT_ID = `\n  fragment ProductVariant on Product {\n    variantBySelectedOptions (selectedOptions: $selectedOptions) {\n      id\n    }\n  }\n  query ($productId:ID!, $selectedOptions: [SelectedOptionInput!]!) {\n    node(id: $productId) { ...ProductVariant }\n  }\n`;
 const checkoutRemoveItem = async (graphQlRunner, checkoutId, lineItemId)=>{
     const result = await graphQlRunner({
@@ -81,7 +32,7 @@ const checkoutRemoveItem = async (graphQlRunner, checkoutId, lineItemId)=>{
     });
     return result.checkoutLineItemsRemove.checkout;
 };
-const checkoutAddItem = async (graphQlRunner, checkoutId, variantOrProductId, productOptions)=>{
+const checkoutAddItem = async (graphQlRunner, checkoutId, variantOrProductId, productOptions, customAttributes)=>{
     let variantId = variantOrProductId;
     if (productOptions) {
         const selectedOptions = Object.entries(productOptions).map((entry)=>({
@@ -112,7 +63,8 @@ const checkoutAddItem = async (graphQlRunner, checkoutId, variantOrProductId, pr
             query: CHECKOUT_CREATE,
             variables: {
                 input: {
-                    lineItems
+                    lineItems,
+                    customAttributes
                 }
             }
         });
@@ -163,9 +115,9 @@ const handleRequest = async (config, optionsPromise, deps)=>{
     let checkout;
     const graphQlQuery = deps.getGraphQlRunner(config.shopifyStore, config.shopifyStorefrontToken);
     if (opts.addVariantId) {
-        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addVariantId);
+        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addVariantId, undefined, opts.customAttributes);
     } else if (opts.addProductId) {
-        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addProductId, opts.addProductOptions);
+        checkout = await deps.checkoutAddItem(graphQlQuery, opts.checkoutId, opts.addProductId, opts.addProductOptions, opts.customAttributes);
     } else if (opts.checkoutId && opts.removeLineitemId) {
         checkout = await deps.checkoutRemoveItem(graphQlQuery, opts.checkoutId, opts.removeLineitemId);
     } else if (opts.checkoutId) {
@@ -186,9 +138,24 @@ const getCartConfiguration = (request)=>{
         shopifyStorefrontToken
     };
 };
+const getCustomAttributesFromCookie = (cookie)=>{
+    if (!cookie) return;
+    const match = cookie.match(/(?:^|;\s*)X-Checkout-Attr-(\w*)=([^;]+)/);
+    if (!match) return;
+    const [, key, value] = match;
+    return [
+        {
+            key,
+            value
+        }
+    ];
+};
+const getCustomAttributesFromRequest = (request)=>getCustomAttributesFromCookie(request.headers.get("Cookie"))
+;
 const getCheckoutOperationParameters = async (request)=>{
     const checkoutOptions = {
-        checkoutId: getCookie(request, "X-checkout")
+        checkoutId: getCookie(request, "X-checkout"),
+        customAttributes: getCustomAttributesFromRequest(request)
     };
     const url = new URL(request.url);
     if (url.searchParams.has("add")) {

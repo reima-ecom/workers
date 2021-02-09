@@ -3,6 +3,7 @@ import type {
   checkoutAddItem,
   checkoutGet,
   checkoutRemoveItem,
+  CustomAttributes,
   getGraphQlRunner,
 } from "./deps.ts";
 import type { getResponseRewriter } from "./rewriter.ts";
@@ -22,6 +23,7 @@ type CheckoutOperationOptions = {
     [optionName: string]: string;
   };
   removeLineitemId?: string;
+  customAttributes?: CustomAttributes;
 };
 
 type RequestHandlerDependencies = {
@@ -51,6 +53,8 @@ const handleRequest = async (
       graphQlQuery,
       opts.checkoutId,
       opts.addVariantId,
+      undefined,
+      opts.customAttributes,
     );
   } else if (opts.addProductId) {
     checkout = await deps.checkoutAddItem(
@@ -58,6 +62,7 @@ const handleRequest = async (
       opts.checkoutId,
       opts.addProductId,
       opts.addProductOptions,
+      opts.customAttributes,
     );
   } else if (opts.checkoutId && opts.removeLineitemId) {
     checkout = await deps.checkoutRemoveItem(
@@ -95,11 +100,27 @@ const getCartConfiguration = (
   };
 };
 
-const getCheckoutOperationParameters = async (
+const getCustomAttributesFromCookie = (
+  cookie: string | null,
+): CustomAttributes | undefined => {
+  if (!cookie) return;
+  const match = cookie.match(
+    /(?:^|;\s*)X-Checkout-Attr-(\w*)=([^;]+)/,
+  );
+  if (!match) return;
+  const [, key, value] = match;
+  return [{ key, value }];
+};
+
+const getCustomAttributesFromRequest = (request: Request) =>
+  getCustomAttributesFromCookie(request.headers.get("Cookie"));
+
+export const getCheckoutOperationParameters = async (
   request: Request,
 ): Promise<CheckoutOperationOptions> => {
   const checkoutOptions: CheckoutOperationOptions = {
     checkoutId: getCookie(request, "X-checkout"),
+    customAttributes: getCustomAttributesFromRequest(request),
   };
   const url = new URL(request.url);
   if (url.searchParams.has("add")) {

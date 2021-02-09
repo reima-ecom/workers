@@ -8,12 +8,18 @@ import {
   CheckoutCreateResult,
   CheckoutQueryResult,
   CheckoutRemoveLineitemResult,
+  CustomAttributes,
   PRODUCT_VARIANT_ID,
   ProductVariantIdResult,
   ProductVariantIdVariables,
 } from "./queries.ts";
 import type { getGraphQlRunner } from "./graphql.ts";
-export type { Checkout, LineItem, MoneyV2 } from "./queries.ts";
+export type {
+  Checkout,
+  CustomAttributes,
+  LineItem,
+  MoneyV2,
+} from "./queries.ts";
 
 export type GraphQlRunner = ReturnType<typeof getGraphQlRunner>;
 
@@ -32,11 +38,17 @@ export const checkoutRemoveItem = async (
   return result.checkoutLineItemsRemove.checkout;
 };
 
+/**
+ * Add a variant to the checkout. Creates a new checkout if no `checkoutId` specified.
+ * 
+ * If a new checkout is created, the optional `customAttributes` are attached to the checkout.
+ */
 export const checkoutAddItem = async (
   graphQlRunner: GraphQlRunner,
   checkoutId: string | undefined,
   variantOrProductId: string,
   productOptions?: { [optionName: string]: string },
+  customAttributes?: CustomAttributes,
 ) => {
   // first assume this is a variant id
   let variantId = variantOrProductId;
@@ -75,7 +87,10 @@ export const checkoutAddItem = async (
     >({
       query: CHECKOUT_CREATE,
       variables: {
-        input: { lineItems },
+        input: {
+          lineItems,
+          customAttributes,
+        },
       },
     });
     return createdCheckout.checkoutCreate.checkout;

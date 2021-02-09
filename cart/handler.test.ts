@@ -1,11 +1,11 @@
-import { assert } from "./deps.ts";
-import { getEventListener } from "./handler.ts";
+import { assertEquals } from "https://deno.land/std@0.86.0/testing/asserts.ts";
+import { getCheckoutOperationParameters, getEventListener } from "./handler.ts";
 import type { Checkout } from "./lib/checkout.ts";
 
 Deno.test("adding works with get variant", () => {
   const eventListener = getEventListener({
     checkoutAddItem: async (runner, checkoutId, variantId) => {
-      assert.strictEqual(variantId, "variant");
+      assertEquals(variantId, "variant");
       return { id: "checkout" } as Checkout;
     },
     getResponseRewriter: (url) =>
@@ -26,7 +26,7 @@ Deno.test("adding works with get variant", () => {
     }),
     respondWith: async (resp) => {
       const body = await (await resp).text();
-      assert.strictEqual(body, "checkout");
+      assertEquals(body, "checkout");
     },
   };
 
@@ -57,9 +57,23 @@ Deno.test("adding works with form post options", () => {
     }),
     respondWith: async (resp) => {
       const body = await (await resp).text();
-      assert.strictEqual(body, "checkout");
+      assertEquals(body, "checkout");
     },
   };
 
   eventListener(event);
+});
+
+Deno.test("checkout operation parameters include custom attribute", async () => {
+  const params = await getCheckoutOperationParameters(
+    new Request("http://localhost", {
+      headers: {
+        "Cookie": "X-Checkout-Attr-A8=a8click",
+      },
+    }),
+  );
+  assertEquals(
+    params.customAttributes,
+    [{ key: "A8", value: "a8click" }],
+  );
 });
